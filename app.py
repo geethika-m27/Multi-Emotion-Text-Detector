@@ -4,14 +4,14 @@ import pandas as pd
 import joblib
 import os
 
-# Step 1: Configure the Streamlit page
+# Step 1: Configure the page
 st.set_page_config(
     page_title="Multi-Emotion Text Detector",
     page_icon="💬",
     layout="wide"
 )
 
-# Step 2: Add the application title
+# Step 2: Application title
 st.title("💬 Multi-Emotion Text Detector")
 st.write(
     "Analyze a sentence or tweet using machine learning "
@@ -20,18 +20,18 @@ st.write(
 
 st.caption(
     "Model: TF-IDF + Logistic Regression | "
-    "Dataset: 12 emotion categories"
+    "Dataset: labelled tweet emotion dataset"
 )
 
-# Step 3: Load the saved model
+# Step 3: Load the selected model
 @st.cache_resource
 def load_model():
-    model_path = "emotion_model.pkl"
+    model_path = "best_emotion_model.joblib"
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(
-            "emotion_model.pkl was not found. "
-            "Run train_model.py first."
+            "best_emotion_model.joblib was not found. "
+            "Run python compare_models.py first."
         )
 
     return joblib.load(model_path)
@@ -42,7 +42,7 @@ except Exception as error:
     st.error(f"Could not load the model: {error}")
     st.stop()
 
-# Step 4: Create the text input
+# Step 4: Text input
 st.subheader("Enter your text")
 
 user_text = st.text_area(
@@ -58,15 +58,16 @@ if st.button("🔍 Detect Emotion", type="primary"):
     else:
         with st.spinner("Analyzing your text..."):
             try:
-                # Predict the most likely emotion
                 prediction = model.predict([user_text])[0]
 
-                st.success(f"Predicted Emotion: {prediction.title()}")
+                st.success(
+                    f"Predicted Emotion: {prediction.title()}"
+                )
 
-                # Display scores when the classifier supports them
-                classifier = model.named_steps.get("classifier")
+                # Display model scores
+                classifier = model.named_steps["classifier"]
 
-                if hasattr(model, "predict_proba"):
+                if hasattr(classifier, "predict_proba"):
                     probabilities = model.predict_proba([user_text])[0]
                     classes = model.classes_
 
@@ -74,17 +75,14 @@ if st.button("🔍 Detect Emotion", type="primary"):
                         "Emotion": classes,
                         "Score (%)": probabilities * 100
                     }).sort_values(
-                        by="Score (%)",
-                        ascending=False
+                        "Score (%)", ascending=False
                     )
 
-                    st.subheader("Emotion Score Analysis")
-
-                    col1, col2 = st.columns([1, 1])
+                    col1, col2 = st.columns(2)
 
                     with col1:
                         st.metric(
-                            "Top predicted emotion",
+                            "Top emotion",
                             prediction.title(),
                             f"{probabilities[list(classes).index(prediction)] * 100:.1f}% model score"
                         )
@@ -97,6 +95,7 @@ if st.button("🔍 Detect Emotion", type="primary"):
                             use_container_width=True
                         )
 
+                    st.subheader("Emotion Score Analysis")
                     st.bar_chart(
                         results.head(8).set_index("Emotion")
                     )
@@ -105,26 +104,42 @@ if st.button("🔍 Detect Emotion", type="primary"):
                         "Scores are model-estimated probabilities, "
                         "not guaranteed measures of emotional intensity."
                     )
+                else:
+                    st.info(
+                        "This classifier does not provide probability "
+                        "scores. The predicted label is shown above."
+                    )
 
                 st.info(
-                    "This tool predicts a label based on patterns in its "
-                    "training data. It may misunderstand sarcasm, context, "
-                    "or mixed emotions."
+                    "This is a machine learning prediction, not a "
+                    "reliable assessment of a person's mental health. "
+                    "Sarcasm, context, and mixed emotions may be missed."
                 )
 
             except Exception as error:
                 st.error(f"Prediction failed: {error}")
 
-# Step 6: Add project information
+# Step 6: Project information
 with st.expander("About this project"):
     st.write(
-        "This application uses TF-IDF to convert text into numerical "
-        "features and Logistic Regression to classify text into one "
-        "of 12 emotion labels."
+        "TF-IDF converts text into numerical features. "
+        "Logistic Regression classifies the text into one of "
+        "the dataset's emotion labels."
     )
+
     st.write(
-        "The model was trained on a labelled tweet dataset. "
-        "Its measured test accuracy was approximately 29.07%."
+        "Three classifiers were compared: Logistic Regression, "
+        "Multinomial Naive Bayes, and Linear SVM."
+    )
+
+    st.write(
+        "On the current test split, Logistic Regression achieved "
+        "29.07% accuracy and a macro F1-score of 22.18%."
+    )
+
+    st.write(
+        "The model is an experimental prototype and may make "
+        "incorrect predictions, especially for underrepresented emotions."
     )
 
 st.divider()
